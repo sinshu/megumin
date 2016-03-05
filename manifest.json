@@ -1,0 +1,26 @@
+{
+	"manifest_version": 2,
+	"name": "めぐみん",
+	"version": "0.1",
+	"description": "2ちゃんねるを見やすくします。",
+	
+	"permissions": [
+		"webRequest",
+		"webRequestBlocking",
+		"http://*.2ch.net/*",
+		"http://*.2ch.sc/*"
+	],
+	
+	"background": {
+		"scripts": [
+			"jquery-2.1.3.min.js",
+			"background.js"
+		]
+	},
+	
+	"web_accessible_resources": [
+		"read.html",
+		"subback.html",
+		"bbstable.html"
+	]
+}
