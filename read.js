@@ -1,10 +1,12 @@
 var regUrl = /(https|http|ttps|ttp):\/\/([!#-%'-;=?-~]+)/g;
-var regAnchor = /(?:(?:(?:&gt;)|ÅÑ){1,2}|Å‚|Åt)([0-9ÇO-ÇX]+(?:[\-Å\Å]Å`Å|Ñü][0-9ÇO-ÇX]+)?(?:[,ÅAÅC][0-9ÇO-ÇX]+(?:[\-Å\Å]Å`Å|Ñü][0-9ÇO-ÇX]+)?)*)/g;
+var regAnchor = /(?:(?:(?:&gt;)|ÅÑ){1,2}|Å‚|Åt)([0-9ÇO-ÇX]{1,4}(?:[\-Å\Å]Å`Å|Ñü][0-9ÇO-ÇX]{1,4})?(?:[,ÅAÅC][0-9ÇO-ÇX]+(?:[\-Å\Å]Å`Å|Ñü][0-9ÇO-ÇX]{1,4})?){0,9})/g;
 var regAnchorHead = /^(?:(?:(?:&gt;)|ÅÑ){1,2}|Å‚|Åt)/;
 var regAnchorHyphen = /[\-Å\Å]Å`Å|Ñü]/;
 var regAnchorComma = /[,ÅAÅC]/;
 
 var posts;
+
+var popupCount = 0;
 
 document.addEventListener("DOMContentLoaded", init);
 
@@ -28,7 +30,7 @@ function getPostFromDatLine(line, number)
 	var name = splitted[0] + "oppekepee";
 	var mail = splitted[1];
 	var info = splitted[2];
-	var comment = splitted[3].replace(/<a href=".+?">(\&gt;\&gt;[\d\-]+)<\/a>/g, "$1");
+	var comment = splitted[3].replace(/<a href=".+?">(\&gt;\&gt;[\d\-]+?)<\/a>/g, "$1");
 	var title = splitted[4];
 	return new Post(number, name, mail, info, comment, title);
 }
@@ -54,7 +56,6 @@ function setRefAnchor(posts) {
 	}
 	for (var n = 1; n < posts.length; n++) {
 		var numbers = getAnchorNumbersFromComment(posts[n].comment);
-		posts[n].comment += "[" + numbers.join(",") + "]";
 		for (var i = 0; i < numbers.length; i++) {
 			if (posts[numbers[i]] != undefined) {
 				posts[numbers[i]].refAnchor.push(n);
@@ -149,7 +150,7 @@ function onDatRequestComplete(data)
 	$("#threadtitle").html(posts[1].title);
 	var $dl = $("#posts");
 	for (var n = 1; n < posts.length; n++) {
-		var $dt = $createDefTermFromPost(posts[n]);
+		var $dt = $createDefTermFromPost(posts[n], true);
 		var $dd = $createDefDescFromPost(posts[n]);
 		$dl.append($dt).append($dd);
 	}
@@ -161,9 +162,14 @@ function onDatRequestError()
 	$("#message").text("DAT ÉtÉ@ÉCÉãÇÃì«Ç›çûÇ›Ç…é∏îsÇµÇ‹ÇµÇΩÅB");
 }
 
-function $createDefTermFromPost(post)
+function $createDefTermFromPost(post, giveIdToNumber)
 {
-	var number = "<a id=\"post" + post.number + "\">" + post.number + "</a>";
+	var number;
+	if (giveIdToNumber) {
+		number = "<a id=\"post" + post.number + "\" href=\"#\">" + post.number + "</a>";
+	} else {
+		number = "<a href=\"#\">" + post.number + "</a>";
+	}
 	var name;
 	if (post.mail.length == 0) {
 		name = "<span class=\"username\"><b>" + post.name + "</b></span>";
@@ -172,8 +178,11 @@ function $createDefTermFromPost(post)
 	}
 	var mail = post.mail;
 	var info = post.info;
-	var html = number + " ñºëOÅF" + name + "[" + mail + "] ìäçeì˙ÅF" + info + "[" + post.refAnchor.join(",") + "]";
+	var html = number + " ñºëOÅF" + name + "[" + mail + "] ìäçeì˙ÅF" + info;
 	var $dt = $("<dt>").html(html);
+	var $a = $dt.children("a");
+	$a.eq(0).attr("popupnumbers", post.refAnchor.join(","))
+	        .attr("popupid", "").mouseover(onAnchorMouseover).mouseout(onAnchorMouseout);
 	return $dt;
 }
 
@@ -186,14 +195,12 @@ function $createDefDescFromPost(post)
 		html = post.comment;
 	}
 	html = html.replace(regAnchor, $createDefDescFromPost_anchorReplacement);
-	var $dd = $("<dd>");
-	$dd.html(html + "<br><br>");
+	var $dd = $("<dd>").html(html + "<br><br>");
 	var $anchors = $dd.children(".anchor");
 	for (var i = 0; i < $anchors.length; i++) {
 		var $anchor = $anchors.eq(i);
-		$anchor.attr("popupid", "");
-		$anchor.mouseover(onAnchorMouseover);
-		$anchor.mouseout(onAnchorMouseout);
+		$anchor.attr("popupnumbers", getAnchorNumbersFromAnchor($anchor.html()).join(","))
+		       .attr("popupid", "").mouseover(onAnchorMouseover).mouseout(onAnchorMouseout);
 	}
 	return $dd;
 }
@@ -227,51 +234,58 @@ function includesUnsafeTag(html)
 	return false;
 }
 
-function onAnchorMouseover()
-{
-	var $anchor = $(this);
-	if ($anchor.attr("popupid").length > 0) {
-		return;
-	}
-	var offset = $anchor.offset();
-	var $popup = $createPopup(getAnchorNumbersFromAnchor($anchor.html()), offset.left, offset.top);
-	$anchor.attr("popupid", $popup.attr("id"));
-}
-
-function onAnchorMouseout()
-{
-	var $anchor = $(this);
-	if ($anchor.attr("popupid").length > 0) {
-		var popupId = $anchor.attr("popupid");
-		$anchor.attr("popupid", "");
-		$("#" + popupId).remove();
-	}
-}
-
-var popupCount = 0;
-
 function $createPopup(numbers, x, y)
 {
 	var $dl = $("<dl>");
-	for (var i = 0; i < numbers.length; i++) {
-		var $dt, $dd;
-		var post = posts[numbers[i]];
-		if (post != undefined) {
-			$dt = $createDefTermFromPost(post);
-			$dd = $createDefDescFromPost(post);
-		} else {
-			$dt = $("<dt>" + numbers[i] + " ñ¢éÊìæÇÃÉåÉX</dt>");
-			$dd = $("<dd><br></dd>");
+	if (numbers.length > 0) {
+		for (var i = 0; i < numbers.length; i++) {
+			var $dt, $dd;
+			var post = posts[numbers[i]];
+			if (post != undefined) {
+				$dt = $createDefTermFromPost(post, false);
+				$dd = $createDefDescFromPost(post);
+			} else {
+				$dt = $("<dt>" + numbers[i] + " ñ¢éÊìæÇÃÉåÉX</dt>");
+				$dd = $("<dd><br></dd>");
+			}
+			$dl.append($dt);
+			$dl.append($dd);
 		}
-		$dl.append($dt);
-		$dl.append($dd);
+	} else {
+		$dl.append("<dt>éQè∆Ç»Çµ</dt>");
 	}
 	var $popup = $("<div>");
-	$popup.attr("id", "popup" + popupCount);
-	$popup.addClass("popup");
-	$popup.append($dl);
+	$popup.attr("id", "popup" + popupCount).addClass("popup").append($dl);
 	$(document.body).append($popup);
 	$popup.css("top", y - $popup.height() - 9 + "px").css("left", x + "px");
 	popupCount++;
 	return $popup;
+}
+
+function onAnchorMouseover()
+{
+	var $source = $(this);
+	if ($source.attr("popupid").length > 0) {
+		return;
+	}
+	var strNumbers = $source.attr("popupnumbers");
+	var numbers;
+	if (strNumbers.length > 0) {
+		numbers = strNumbers.split(",").map(n => parseInt(n));
+	} else {
+		numbers = new Array();
+	}
+	var offset = $source.offset();
+	var $popup = $createPopup(numbers, offset.left, offset.top);
+	$source.attr("popupid", $popup.attr("id"));
+}
+
+function onAnchorMouseout()
+{
+	var $source = $(this);
+	if ($source.attr("popupid").length > 0) {
+		var popupId = $source.attr("popupid");
+		$source.attr("popupid", "");
+		$("#" + popupId).remove();
+	}
 }
